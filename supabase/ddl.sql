@@ -1,0 +1,2 @@
+-- Supabase schema for Ä/Bilden
+-- TODO: Add tables and relationships
