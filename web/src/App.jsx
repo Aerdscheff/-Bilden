@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 
 import Home from './pages/Home';
+import './App.css';
 import Browse from './pages/Browse';
 import ProposalForm from './pages/ProposalForm';
 import Fast from './pages/Fast';
@@ -10,6 +11,7 @@ import Profile from './pages/Profile';
 
 /**
  * Root component defining all application routes.
+ 
  *
  * This component wires together the high-level pages used by the Ä/Bilden
  * PWA: selection des thématiques, création de proposition, navigation
