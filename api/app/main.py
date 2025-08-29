@@ -94,18 +94,41 @@ def get_stats(proposal_id: str):
 @app.post("/cron/auto-seal")
 def auto_seal(x_cron_token: str = Header(None)):
     expected_token = os.environ.get("CRON_TOKEN")
-    # Token check: Accept header "Authorization: Bearer <token>" or plain token
     token = x_cron_token.replace("Bearer ", "") if x_cron_token else None
     if expected_token and token != expected_token:
         raise HTTPException(status_code=401, detail="Invalid token")
-    # TODO: implement sealing logic (check consent thresholds, update decision_state)
-    return {"sealed": 0, "message": "Auto-seal stub executed"}
+    sealed_count = 0
+    # Rechercher toutes les propositions LIVE
+    proposals_resp = supabase.table("proposals").select("*").eq("decision_state", "live").execute()
+    if proposals_resp.data:
+        for prop in proposals_resp.data:
+            prop_id = prop.get("id")
+            # Vérifier s’il existe des objections ouvertes
+            obj_resp = supabase.table("objections").select("id").eq("proposal_id", prop_id).eq("status", "open").execute()
+            open_objections = obj_resp.data if obj_resp.data else []
+            if len(open_objections) == 0:
+                # Mettre à jour decision_state
+                supabase.table("proposals").update({"decision_state": "sealed"}).eq("id", prop_id).execute()
+                # Insérer une entrée dans decisions (version 1)
+                supabase.table("decisions").insert({
+                    "proposal_id": prop_id,
+                    "version": 1,
+                    "review_date": (datetime.utcnow() + timedelta(days=180)).isoformat()
+                }).execute()
+                sealed_count += 1
+    return {"sealed": sealed_count, "message": f"Auto-seal executed on {sealed_count} proposals"}
+
 
 @app.get("/export/decision-json/{proposal_id}")
 def export_decision_json(proposal_id: str):
-    proposal = supabase.table("proposals").select("*").eq("id", proposal_id).execute().data
+    # Récupérer la proposition
+    proposal_resp = supabase.table("proposals").select("*").eq("id", proposal_id).execute()
+    proposal = proposal_resp.data[0] if proposal_resp.data else None
+    # Récupérer toutes les décisions associées, triées par version
+    decisions_resp = supabase.table("decisions").select("*").eq("proposal_id", proposal_id).order("version").execute()
+    decisions = decisions_resp.data if decisions_resp.data else []
     return {
         "proposal": proposal,
-        "decision": "Stub export",
+        "decisions": decisions,
         "timestamp": datetime.utcnow().isoformat()
     }
